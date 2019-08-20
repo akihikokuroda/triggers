@@ -25,7 +25,9 @@ import (
 	"github.com/tektoncd/triggers/pkg/reconciler"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+        "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+        "k8s.io/apimachinery/pkg/util/intstr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 	"knative.dev/pkg/controller"
@@ -208,6 +210,65 @@ func (c *Reconciler) Reconcile(ctx context.Context, key string) error {
 			return err
 		}
 		c.Logger.Info("Updated EventListener Service %s in Namespace %s", el.Name, el.Namespace)
+	}
+
+	externalUrl := el.Name + "." +"localhost" + ".nip.io"
+	ingress := &v1beta1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			// Create the EventListener's Service in the same Namespace as where the
+			// EventListener was created
+			Namespace: el.Namespace,
+			// Give the Service the same name as the EventListener
+			Name: el.Name,
+			// If our EventListener is deleted, then its Service should be as well
+			OwnerReferences: []metav1.OwnerReference{*el.GetOwnerReference()},
+			Labels:          labels,
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: externalUrl,
+					IngressRuleValue: v1beta1.IngressRuleValue{ 
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Backend: v1beta1.IngressBackend{
+										ServiceName: el.Name,
+										ServicePort: intstr.IntOrString{
+											IntVal: int32(Port),
+										},
+									}, 
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	oldIngress, err := c.ExtensionsV1beta.Ingresses(el.Namespace).Get(el.Name, metav1.GetOptions{})
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			c.Logger.Errorf("Error getting Ingresses: %s", err)
+			return err
+		}
+
+		// Create the EventListener Ingress
+		_, err = c.ExtensionsV1beta.Ingresses(el.Namespace).Create(ingress)
+		c.Logger.Infof("Created EventListener Ingress %s in Namespace %s", el.Name, el.Namespace)
+		if err != nil {
+			c.Logger.Errorf("Error creating EventListener Ingress: %s", err)
+			return err
+		}
+	} else if !reflect.DeepEqual(oldIngress, ingress) {
+		// Update the EventListener Ingress
+		oldIngress.Spec = ingress.Spec
+		_, err = c.ExtensionsV1beta.Ingresses(el.Namespace).Update(oldIngress)
+		if err != nil {
+			c.Logger.Errorf("Error updating EventListener Ingress: %s", err)
+			return err
+		}
+		c.Logger.Info("Updated EventListener Ingress %s in Namespace %s", el.Name, el.Namespace)
 	}
 
 	return nil

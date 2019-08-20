@@ -25,6 +25,7 @@ import (
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -38,6 +39,7 @@ import (
 // creating our controllers.
 type Options struct {
 	KubeClientSet     kubernetes.Interface
+	ExtensionsV1beta  v1beta1.ExtensionsV1beta1Interface  
 	PipelineClientSet pipelineclientset.Interface
 	TriggersClientSet triggersclientset.Interface
 	CachingClientSet  cachingclientset.Interface
@@ -61,6 +63,9 @@ func (o Options) GetTrackerLease() time.Duration {
 type Base struct {
 	// KubeClientSet allows us to talk to the k8s for core APIs
 	KubeClientSet kubernetes.Interface
+
+	// ExtensionsV1beta allows us to talk to the k8s for extension APIs
+	ExtensionsV1beta v1beta1.ExtensionsV1beta1Interface
 
 	// PipelineClientSet allows us to configure pipeline objects
 	PipelineClientSet pipelineclientset.Interface
@@ -109,6 +114,7 @@ func NewBase(opt Options, controllerAgentName string) *Base {
 
 	base := &Base{
 		KubeClientSet:     opt.KubeClientSet,
+		ExtensionsV1beta:  opt.ExtensionsV1beta,
 		PipelineClientSet: opt.PipelineClientSet,
 		TriggersClientSet: opt.TriggersClientSet,
 		CachingClientSet:  opt.CachingClientSet,
