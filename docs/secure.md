@@ -129,6 +129,24 @@ spec:
   tls:
     termination: Reencrypt
 ```
+2. Create the route.sh with the following contents in the work directory.
+```
+#!/bin/bash
+
+# work directory (path to cert, keys, script & yaml file)
+export WORK_DIR=""
+
+# *Make sure names contain only lowercase alphanumeric characters, . or -. Must start & end with alphanumeric characters*
+export EVEMT_LISTENER_NAME=""
+export NAMEAPACE=""
+
+# populate variables in https-ingress & apply yaml file:
+envsubst < ${WORK_DIR}/route.yaml | oc apply -f -
+
+echo "Done. Now access the host with https://"${URL}
+```
+3. Edit route.sh file with your configuration information
+4. Execute route.sh
 
 Reference: [Route](https://docs.openshift.com/container-platform/4.1/networking/routes/route-configuration.html)
 ## Configuring Event source
