@@ -5,11 +5,11 @@ The communication between the event source and the event listner must be secure 
 The event from outside of the kubernetes cluster comes through one of the exposed entry points and is routed to the event listener.  The ingress or route can be defined as the entry point for the event listener and it can be configured to receive the event using TLS. 
 ### Ingress 
 Ingress exposes HTTP and HTTPS routes from outside the cluster to services within the cluster. Traffic routing is controlled by rules defined on the Ingress resource.
-#### Prerequit
-The certificate used for the ingress must be prepared before creating the ingress for the event listener.  If there isn't, create a self-signed certificate.
+#### Prerequisite
+The certificate used for the ingress must be prepared before creating the ingress for the event listener.  The certificate file and certificate key file in the pem format are necessary.  If there isn't, create a self-signed certificate.
 #### Steps
 
-1. Create a work directory and create the ingress.yaml file wiht the following contents in the directory.
+1. Create a work directory and create the ingress.yaml file with the following contents in the directory.
 ```
 apiVersion: extensions/v1beta1
 kind: Ingress
@@ -26,15 +26,15 @@ spec:
     http:
       paths:
       - backend:
-          serviceName: tekton-dashboard
+          serviceName: ${EVENT_LISTENER_NAME}
           servicePort: 8082
 ```
-2. create the ingress.sh with the following contests in the work directory.
+2. Create the ingress.sh with the following contents in the work directory.
 ```
 #!/bin/bash
 
 # work directory (path to cert, keys, script & yaml file)
-export INGRESS_DIR=""
+export WORK_DIR=""
 
 # certificate data
 # *Make sure names contain only lowercase alphanumeric characters, . or -. Must start & end with alphanumeric characters*
@@ -42,23 +42,25 @@ export CERTIFICATE_KEY=""
 export CERTIFICATE_NAME=""
 # IP address of the Proxy node (or master node)
 export IP_ADDRESS=""
-export URL="tekton-dashboard.${IP_ADDRESS}.nip.io"
+export URL="${EVENT_LISTENER_NAME}.${IP_ADDRESS}.nip.io"
 export NAMESPACE=""
 export EVENT_LISTENER_NAME=""
 
 # create the secret
-kubectl create secret tls ${CERTIFICATE_SECRET_NAME} --cert=${INGRESS_DIR}/${CERTIFICATE_NAME}.pem --key=${INGRESS_DIR}/${CERTIFICATE_KEY}.pem -n $(NAMESPACE)
+kubectl create secret tls ${CERTIFICATE_SECRET_NAME} --cert=${WORK_DIR}/${CERTIFICATE_NAME}.pem --key=${WORK_DIR}/${CERTIFICATE_KEY}.pem -n $(NAMESPACE)
 
 # populate variables in https-ingress & apply yaml file:
-envsubst < ${INGRESS_DIR}/https-ingress.yaml | kubectl apply -f -
+envsubst < ${WORK_DIR}/https-ingress.yaml | kubectl apply -f -
 
 echo "Done. Now access the host with https://"${URL}
 ```
 3. Edit ingress.sh file with your configuration information
-4. Place the $(CERTIFICATE_NAME).pem and $(CERTIFICATE_KEY).pem file in the work directory 
+4. Place the certificate files ($(CERTIFICATE_NAME).pem and $(CERTIFICATE_KEY).pem) in the work directory 
 5. Execute ingress.sh
 
-[ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
+These steps expose the event listener at "https://<event listener name>.<proxy node IP>.nip.io>/".  Use this URL in the event source configuration.
+
+Reference: [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
 
 ### Generate self signed certificate
 
