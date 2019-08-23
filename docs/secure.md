@@ -6,7 +6,7 @@ The event from outside of the kubernetes cluster comes through one of the expose
 ### Ingress 
 Ingress exposes HTTP and HTTPS routes from outside the cluster to services within the cluster. Traffic routing is controlled by rules defined on the Ingress resource.
 #### Prerequisite
-The certificate used for the ingress must be prepared before creating the ingress for the event listener.  The certificate file and certificate key file in the pem format are necessary.  If there isn't, create a self-signed certificate.
+The certificate used for the ingress must be prepared before creating the ingress for the event listener.  The certificate file and certificate key file in the pem format are necessary.  If there isn't, create a selfsigned certificate.
 #### Steps
 
 1. Create a work directory and create the ingress.yaml file with the following contents in the directory.
@@ -58,24 +58,24 @@ echo "Done. Now access the host with https://"${URL}
 4. Place the certificate files ($(CERTIFICATE_NAME).pem and $(CERTIFICATE_KEY).pem) in the work directory 
 5. Execute ingress.sh
 
-These steps expose the event listener at "https://<event listener name>.<proxy node IP>.nip.io>/".  Use this URL in the event source configuration.
+These steps expose the event listener at "https://\<event listener name\>.\<proxy node IP\>.nip.io/".  Use this URL in the event source configuration.
 
 Reference: [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
 
 ### Generate self signed certificate
 
-If the cluster doesn't have the CA signed certificate or the cluster CA certificate, the self-signed certificate must be generated to set to the ingress.
+If the cluster doesn't have the CA signed certificate or the cluster CA certificate, the selfsigned certificate must be generated to set to the ingress.
 
 #### Steps
 
 1. Create a working directory
-2. create the certificate.sh with the following contests in the work directory.
+2. Create the certificate.sh with the following contests in the work directory.
 
 ```
 #!/bin/bash
 
 # work directory (path to cert, keys, script & yaml file)
-export INGRESS_DIR=""
+export WORK_DIR=""
 
 # certificate data
 # *Make sure names contain only lowercase alphanumeric characters, . or -. Must start & end with alphanumeric characters*
@@ -92,10 +92,10 @@ export ORGANIZATIONAl_UNIT=""
 export COMMON_NAME=$URL
 
 # create a private key for the CA & add passphrase
-openssl genrsa -des3 -out ${INGRESS_DIR}/$CERTIFICATE_KEY.pem -passout pass:${CERTIFICATE_KEY_PASSPHRASE} 2048
+openssl genrsa -des3 -out ${WORK_DIR}/${CERTIFICATE_KEY}.pem -passout pass:${CERTIFICATE_KEY_PASSPHRASE} 2048
 
 # generate the root CA
-openssl req -x509 -new -nodes -key ${INGRESS_DIR}/${CERTIFICATE_KEY}.pem -sha256 -days 1825 -out ${INGRESS_DIR}/${CERTIFICATE_NAME}.pem -passin pass:${CERTIFICATE_KEY_PASSPHRASE} -subj /C=${COUNTRY}/ST=${STATE}/L=${LOCATION}/O=${ORGANIZATION}/OU=${ORGANIZATIONAl_UNIT}/CN=${COMMON_NAME}
+openssl req -x509 -new -nodes -key ${WORK_DIR}/${CERTIFICATE_KEY}.pem -sha256 -days 1825 -out ${WORK_DIR}/${CERTIFICATE_NAME}.pem -passin pass:${CERTIFICATE_KEY_PASSPHRASE} -subj /C=${COUNTRY}/ST=${STATE}/L=${LOCATION}/O=${ORGANIZATION}/OU=${ORGANIZATIONAl_UNIT}/CN=${COMMON_NAME}
 
 # for some reason the key wasn't being parsed when trying to create it with kubectl so this command fixes it
 openssl rsa -in ${INGRESS_DIR}/${CERTIFICATE_KEY}.pem -out ${INGRESS_DIR}/${CERTIFICATE_KEY}.pem -passin pass:${CERTIFICATE_KEY_PASSPHRASE}
@@ -103,13 +103,34 @@ openssl rsa -in ${INGRESS_DIR}/${CERTIFICATE_KEY}.pem -out ${INGRESS_DIR}/${CERT
 echo "Done."
 ```
 3. Edit certificate.sh file with your configuration information
-4. Execute ingress.sh
-5. Cretufucate files are in the work directlry
+4. Execute certificate.sh
+5. Certificate files ($(CERTIFICATE_NAME).pem and $(CERTIFICATE_KEY).pem) are in the work directlry
 
-[Certificate generation](https://www.openssl.org/docs/man1.1.1/man1/)
+Reference: [Certificate generation](https://www.openssl.org/docs/man1.1.1/man1/)
 ### Ingress with cert-manager
+If your cluster has the cert-manager running, the signed certificate is automatically created and attached for the ingress.
 
+Refernece: [Cert-manager](https://itnext.io/automated-tls-with-cert-manager-and-letsencrypt-for-kubernetes-7daaa5e0cae4)
 ### Route
+In the OpeShift cluster, the defining the route is easy way to configure the entry point with TLS. 
+
+#### Steps
+1. Create a work directory and create the route.yaml file with the following contents in the directory.
+```
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ${EVENT_LISTENER_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  to:
+    kind: Service
+    name: ${EVENT_LISTENER_NAME}
+  tls:
+    termination: Reencrypt
+```
+
+Reference: [Route](https://docs.openshift.com/container-platform/4.1/networking/routes/route-configuration.html)
 ## Configuring Event source
 The way to configure the event source is unique for each event source.
 ### github
